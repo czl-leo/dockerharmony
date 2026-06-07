@@ -54,7 +54,7 @@ tar -zxf ${apk_file_name} -C /
 # 现在你可以使用 make 命令了
 ```
 
-你也可以在 [这个社区](https://gitcode.com/OpenHarmonyPCDeveloper) 进行探索，里面有一些已经移植到 OpenHarmony 平台上的软件。
+此外，你也可以使用一些第三方的包管理器来获取软件包，例如：[Harmonybrew](https://atomgit.com/Harmonybrew)。
 
 ## 在 GitHub 工作流中使用
 要在 GitHub 工作流中使用这个镜像，首先你使用的执行机需要是 arm64 架构的。GitHub 提供了 arm64 架构的 [partner runner images](https://github.com/actions/partner-runner-images)，我们可以免费使用它们。

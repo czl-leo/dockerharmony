@@ -54,7 +54,7 @@ tar -zxf ${apk_file_name} -C /
 # You can now use the 'make' command.
 ```
 
-You can also explore software that has already been ported to OpenHarmony via [this community repository](https://gitcode.com/OpenHarmonyPCDeveloper).
+Alternatively, you can use third-party package managers to install software, such as [Harmonybrew](https://atomgit.com/Harmonybrew).
 
 ## Use in GitHub workflow
 
