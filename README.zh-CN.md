@@ -28,7 +28,8 @@ docker exec -it ohos sh
 可用的标签
 | 标签       | 描述                                                         |
 |------------|----------------------------------------------------------    |
-| latest     | 最新的正式版本（当前等价于 6.1）                             |
+| latest     | 最新的正式版本（当前等价于 7.0）                             |
+| 7.0        | 基于 OpenHarmony 7.0 Release 制作的镜像                      |
 | 6.1        | 基于 OpenHarmony 6.1 Release 制作的镜像                      |
 | 6.0        | 基于 OpenHarmony 6.0 Release 制作的镜像                      |
 | main       | 主干版本，基于本仓库 main 分支的最新构建脚本进行构建         | 
@@ -82,26 +83,29 @@ jobs:
       # 编写你的业务
 ```
 
-这个方案参考了：https://github.com/actions/runner/issues/801.
-
 ## 从源码构建镜像
 
 环境要求:
 - Ubuntu 22.04 x64（不支持 24.04）
-- 至少 300GB 的可用磁盘空间
-- 机器上安装了 Docker
-- 一个通畅的网络环境，可以正常访问 GitHub、Gitee 等网站
-- 使用 root 用户 (OpenHarmony 源码里面的 build.sh 就需要 root, 因此这个项目也同样需要)
+- 至少 250GB 的可用磁盘空间（`build-components.sh` 会下载 71GB 的源码包并解压）
+- 一个通畅的网络环境，可以正常访问 GitHub（`build-curl.sh` 需要从 GitHub 下载源码）
+- 安装了 Docker
 
-建议:
-- 建议构建之前重置你的构建机，使用一个干净全新的构建机来进行构建。这可以避免很多因环境问题导致的构建失败。
-- 建议使用尽可能高的带宽和 CPU 规格，因为构建一个操作系统需要下载和编译非常多的文件。
+安装依赖：
+```sh
+sudo apt update
+sudo apt install -y \
+    bison ccache default-jdk flex gcc-arm-linux-gnueabi gcc-arm-none-eabi \
+    genext2fs liblz4-tool libssl-dev libtinfo5 libtool mtd-utils mtools \
+    openssl patchelf pkg-config python-is-python3 ruby scons u-boot-tools \
+    unzip zip aria2 cmake autoconf git patch
+```
 
-构建容器镜像的命令如下：
+构建镜像：
 ```sh
 git clone https://github.com/hqzing/dockerharmony.git
 cd dockerharmony
-./build-images.sh
+./build-components.sh
 ./build-curl.sh
 ./build-rootfs.sh
 DOCKER_BUILDKIT=1 docker buildx build --platform linux/arm64 -t dockerharmony:latest .
@@ -123,4 +127,4 @@ docker run --privileged --rm tonistiigi/binfmt --install all
 docker run --name=ohos -itd --platform linux/arm64 dockerharmony:latest
 ```
 
-由于软件模拟的速度远慢于原生 arm64 硬件，建议仅将此方法用于快速验证。
+由于软件模拟的速度远慢于原生 arm64 硬件，此方法仅适用于快速验证，不适用于日常工作。

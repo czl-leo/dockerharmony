@@ -1,5 +1,21 @@
-OpenHarmony-v6.1-Release
-code-v6.1-Release.tar.gz
-system
-ramdisk
-curl-8.8.0-ohos-arm64
+# OpenHarmony source code tarball and extracted tree
+code-v*-Release.tar.gz
+OpenHarmony-v*-Release/
+
+# Curl/openssl/zlib source tarballs downloaded by build-curl.sh
+curl-8.8.0.tar.gz
+openssl-3.0.9.tar.gz
+zlib-1.3.1.tar.gz
+ohos-sdk-windows_linux-public.tar.gz
+
+# Source trees extracted by build-curl.sh (cleaned up after build)
+curl-8.8.0/
+openssl-3.0.9/
+zlib-1.3.1/
+
+# Intermediate build artifacts
+.build/
+curl-8.8.0-ohos-arm64/
+
+# Container rootfs assembled by build-rootfs.sh
+rootfs/

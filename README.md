@@ -28,7 +28,8 @@ docker exec -it ohos sh
 Available tags
 | Tag     | Description                                                             |
 |---------|-------------------------------------------------------------------------|
-| latest  | The latest release (currently equivalent to 6.1).                       |
+| latest  | The latest release (currently equivalent to 7.0).                       |
+| 7.0     | An image based on OpenHarmony 7.0 Release.                              |
 | 6.1     | An image based on OpenHarmony 6.1 Release.                              |
 | 6.0     | An image based on OpenHarmony 6.0 Release.                              |
 | main    | The mainline version, built using the latest build scripts from the main branch of this repository. |
@@ -83,26 +84,29 @@ jobs:
       # Do your work...
 ```
 
-This solution refers to https://github.com/actions/runner/issues/801.
-
 ## Build image from source
 
 Environment Requirements:
 - Ubuntu 22.04 x64 (24.04 is not supported)
-- At least 300GB of available disk space
-- Docker installed on the build machine
-- A network environment that allows seamless access to GitHub, Gitee, etc
-- Use the root user (OpenHarmony's build.sh requires root, so this project does too)
+- At least 250GB of available disk space (`build-components.sh` download and extract 71GB of source archives)
+- A network environment that allows seamless access to GitHub (`build-curl.sh` needs to download source from GitHub)
+- Docker installed
 
-Recommendations:
-- It is recommended that you reset your build machine before building, and use a clean and brand-new build machine for the build. This avoids many build failures caused by environment issues.
-- It is recommended to use high bandwidth and a powerful CPU, as building an operating system involves downloading and compiling many files.
+Install the dependencies:
+```sh
+sudo apt update
+sudo apt install -y \
+    bison ccache default-jdk flex gcc-arm-linux-gnueabi gcc-arm-none-eabi \
+    genext2fs liblz4-tool libssl-dev libtinfo5 libtool mtd-utils mtools \
+    openssl patchelf pkg-config python-is-python3 ruby scons u-boot-tools \
+    unzip zip aria2 cmake autoconf git patch
+```
 
-The commands to build the container image are as follows:
+Build the image:
 ```sh
 git clone https://github.com/hqzing/dockerharmony.git
 cd dockerharmony
-./build-images.sh
+./build-components.sh
 ./build-curl.sh
 ./build-rootfs.sh
 DOCKER_BUILDKIT=1 docker buildx build --platform linux/arm64 -t dockerharmony:latest .
@@ -124,4 +128,4 @@ Now you can run arm64 containers on the x64 host:
 docker run --name=ohos -itd --platform linux/arm64 dockerharmony:latest
 ```
 
-Emulated execution is much slower than native arm64 hardware, so I recommend using it only for quick verification.
+Since software emulation is much slower than native arm64 hardware, this method is only suitable for quick verification, not for daily work.

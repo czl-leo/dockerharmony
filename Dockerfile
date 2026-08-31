@@ -1,3 +1,3 @@
 FROM scratch
-COPY ./ramdisk /
+COPY ./rootfs /
 CMD ["/bin/sh"]
