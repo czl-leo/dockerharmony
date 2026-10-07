@@ -58,7 +58,8 @@ tar -zxf ${apk_file_name} -C /
 此外，你也可以使用一些第三方的包管理器来获取软件包，例如：[Harmonybrew](https://atomgit.com/Harmonybrew)。
 
 ## 在 GitHub 工作流中使用
-要在 GitHub 工作流中使用这个镜像，首先你使用的执行机需要是 arm64 架构的。GitHub 提供了 arm64 架构的 [partner runner images](https://github.com/actions/partner-runner-images)，我们可以免费使用它们。
+
+要在 GitHub 工作流中使用这个镜像，首先你使用的执行机需要是 arm64 架构的。GitHub 提供了 arm64 架构的 [runner images](https://github.com/actions/runner-images)，我们可以免费使用它们。
 
 需要注意的是，GitHub 上许多预置的工作流（例如 actions/checkout）依赖于 Node.js 运行时环境，我们需要为此做一些特殊准备。
 

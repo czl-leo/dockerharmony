@@ -59,7 +59,7 @@ Alternatively, you can use third-party package managers to install software, suc
 
 ## Use in GitHub workflow
 
-To use this image in GitHub workflow, you first need to use an arm64 runner. GitHub provides arm64 [partner runner images](https://github.com/actions/partner-runner-images) that we can use for free.
+To use this image in GitHub workflow, you first need to use an arm64 runner. GitHub provides arm64 [runner images](https://github.com/actions/runner-images) that we can use for free.
 
 It should be noted that many preconfigured workflows on GitHub (such as actions/checkout) depend on the Node.js runtime environment. We need to make some special preparations for them.
 
