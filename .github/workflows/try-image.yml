@@ -2,7 +2,7 @@ name: Try image
 
 on:
   push:
-    branches: [ "try-image" ]
+    branches: [ "dev" ]
 
 jobs:
   smoke:

@@ -2,7 +2,7 @@ name: ArkTS unit test
 
 on:
   push:
-    branches: [ "try-image" ]
+    branches: [ "dev" ]
   workflow_dispatch:
 
 jobs:
