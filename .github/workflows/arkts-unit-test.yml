@@ -30,6 +30,24 @@ jobs:
           rm -f clt.tar.xz
           find clt -maxdepth 2 -type d -name command-line-tools -printf '%p\n'
 
+      - name: Cache Linux x64 Previewer
+        id: x64-previewer
+        uses: actions/cache@v4
+        with:
+          path: x64-previewer
+          key: previewer-linux-x64-6.1.1.300
+
+      - name: Download Linux x64 Previewer
+        if: steps.x64-previewer.outputs.cache-hit != 'true'
+        run: |
+          set -eux
+          curl -fL --retry 3 -o x64clt.zip \
+            https://github.com/isaced/setup-ohos/releases/download/v1/commandline-tools-linux-x64-6.1.1.300.zip
+          rm -rf x64-previewer
+          unzip -q x64clt.zip 'command-line-tools/sdk/default/openharmony/previewer/*' -d x64-previewer
+          rm -f x64clt.zip
+          find x64-previewer -name 'libshared_libz.so' -o -name 'Previewer' -type f
+
       - name: Run ArkTS unit tests in dockerharmony
         run: |
           set -eux
@@ -134,6 +152,10 @@ jobs:
               printf "%s\n" "#!/bin/sh" "exit 0" > /tmp/ohos-bin/lsof
               chmod +x /tmp/ohos-bin/lsof
               prev=$TOOL_HOME/sdk/default/openharmony/previewer/common/bin/Previewer
+              x64bin=/work/x64-previewer/command-line-tools/sdk/default/openharmony/previewer/common/bin
+              if [ -d "$x64bin" ]; then
+                cp -a "$x64bin"/. "$(dirname "$prev")"/
+              fi
               if [ -f "$prev" ] && [ ! -f "$prev.bin" ]; then
                 mv "$prev" "$prev.bin"
               fi
