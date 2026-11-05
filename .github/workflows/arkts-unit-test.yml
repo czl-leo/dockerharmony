@@ -59,6 +59,35 @@ jobs:
             gcc -shared -fPIC -nostdlib -Wl,-soname,libhilog.so -o stub/libhilog.so stub/hilog.c
             readelf -d stub/libhilog.so
           fi
+          # The packaged Previewer is the x86_64 Linux host binary. Register qemu
+          # so the arm64 container can execute it, and stage a glibc loader for it.
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static xvfb x11-xserver-utils
+          docker run --privileged --rm tonistiigi/binfmt --install amd64
+          Xvfb :99 -screen 0 1080x1920x24 >/tmp/xvfb.log 2>&1 &
+          sleep 1
+          DISPLAY=:99 xhost +local:
+          rm -rf x64root
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD/x64root:/out" \
+            ubuntu:24.04 \
+            bash -c 'set -eux
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                libc6 libstdc++6 libgcc-s1 zlib1g libexpat1 \
+                libx11-6 libxext6 libxrender1 libxi6 libxrandr2 libxfixes3 \
+                libxcursor1 libxinerama1 libxcb1 \
+                libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
+                libnss3 libdrm2 libgbm1 libasound2t64 ca-certificates
+              mkdir -p /out/lib/x86_64-linux-gnu /out/lib64
+              cp -a /lib/x86_64-linux-gnu/. /out/lib/x86_64-linux-gnu/
+              if [ -e /lib64/ld-linux-x86-64.so.2 ]; then
+                cp -a /lib64/ld-linux-x86-64.so.2 /out/lib64/
+              else
+                cp -a /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /out/lib64/ld-linux-x86-64.so.2
+              fi
+            '
           prevjs=$(find "$tool" -path '*localTest/previewer.js' -type f | head -n 1 || true)
           if [ -n "$prevjs" ]; then
             # Windows appends Previewer.exe. Other platforms should append Previewer.
@@ -77,9 +106,11 @@ jobs:
             '
           fi
           docker pull hqzing/dockerharmony:latest
-          docker run --rm \
+          docker run --rm --security-opt seccomp=unconfined \
             -v "$PWD:/work" \
+            -v /tmp/.X11-unix:/tmp/.X11-unix \
             -w /work \
+            -e DISPLAY=:99 \
             -e TOOL_HOME="/work/$tool" \
             -e DEVECO_SDK_HOME="/work/$tool/sdk" \
             -e NODE_HOME="/work/$tool/tool/node" \
@@ -106,11 +137,27 @@ jobs:
               echo "::notice::hvigor $(command -v hvigorw)"
               echo "::notice::ohpm $(command -v ohpm)"
               prev=$TOOL_HOME/sdk/default/openharmony/previewer/common/bin/Previewer
-              if [ -f "$prev" ]; then
+              if [ -f "$prev" ] && [ ! -f "$prev.bin" ]; then
+                mv "$prev" "$prev.bin"
+              fi
+              if [ -f "$prev.bin" ]; then
+                chmod +x "$prev.bin"
+                "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev.bin"
+                printf "%s\n" "#!/bin/sh" \
+                  "dir=\$(CDPATH= cd -- \"\$(dirname \"\$0\")\" && pwd)" \
+                  "export LD_LIBRARY_PATH=\"\$dir\"" \
+                  "export LIBGL_ALWAYS_SOFTWARE=1" \
+                  "exec \"\$dir/Previewer.bin\" \"\$@\"" > "$prev"
                 chmod +x "$prev"
-                "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev"
               else
                 echo "::notice::Previewer missing"
+              fi
+              mkdir -p /lib/x86_64-linux-gnu /lib64
+              if [ -d /work/x64root/lib/x86_64-linux-gnu ]; then
+                cp -a /work/x64root/lib/x86_64-linux-gnu/. /lib/x86_64-linux-gnu/
+              fi
+              if [ -e /work/x64root/lib64/ld-linux-x86-64.so.2 ]; then
+                cp -a /work/x64root/lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
               fi
               cd /work/ohos-har
               ohpm config set registry https://ohpm.openharmony.cn/ohpm/
