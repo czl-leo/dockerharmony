@@ -141,12 +141,25 @@ jobs:
                 chmod +x "$prev.bin"
                 test -x /work/qemu-x86_64-static
                 "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev.bin"
+                # qemu -L looks up libraries inside the sysroot, not next to the binary.
+                mkdir -p /work/x64root/lib/x86_64-linux-gnu
+                find "$TOOL_HOME" -path '*/previewer/*' -name '*.so' -type f > /tmp/previewer-sos.txt || true
+                while read -r so; do
+                  machine=$("$NODE_HOME/bin/node" -e "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.length<20||b[0]!==0x7f) process.exit(2); process.stdout.write(String(b.readUInt16LE(18)))" "$so" || true)
+                  if [ "$machine" = "62" ]; then
+                    cp -a "$so" /work/x64root/lib/x86_64-linux-gnu/
+                  fi
+                done < /tmp/previewer-sos.txt
+                if [ ! -f /work/x64root/lib/x86_64-linux-gnu/libshared_libz.so ]; then
+                  echo "::error::libshared_libz.so is not in the command line tools"
+                  find "$TOOL_HOME" -name 'libshared_libz*' -type f
+                  exit 1
+                fi
                 printf "%s\n" "#!/bin/sh" \
                   "dir=\$(CDPATH= cd -- \"\$(dirname \"\$0\")\" && pwd)" \
                   "export LIBGL_ALWAYS_SOFTWARE=1" \
                   "export QT_QPA_PLATFORM=offscreen" \
-                  "export LD_LIBRARY_PATH=\"\$dir:/work/x64root/lib/x86_64-linux-gnu:/work/x64root/usr/lib/x86_64-linux-gnu\"" \
-                  "exec /work/qemu-x86_64-static -L /work/x64root \"\$dir/Previewer.bin\" \"\$@\"" > "$prev"
+                  "exec /work/qemu-x86_64-static -L /work/x64root -E LD_LIBRARY_PATH=/lib/x86_64-linux-gnu \"\$dir/Previewer.bin\" \"\$@\"" > "$prev"
                 chmod +x "$prev"
               else
                 echo "::notice::Previewer missing"
