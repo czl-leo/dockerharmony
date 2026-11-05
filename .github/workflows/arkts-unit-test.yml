@@ -58,7 +58,11 @@ jobs:
             /bin/sh -c '
               set -eu
               export PATH="$NODE_HOME/bin:$TOOL_HOME/bin:$PATH"
-              export LD_LIBRARY_PATH="$TOOL_HOME/sdk/default/openharmony/toolchains/lib:${LD_LIBRARY_PATH:-}"
+              # es2abc needs libhilog.so beside it. Windows finds that DLL next to
+              # es2abc.exe; musl only searches LD_LIBRARY_PATH.
+              arkbin=$TOOL_HOME/sdk/default/openharmony/ets/build-tools/ets-loader/bin/ark/build/bin
+              export LD_LIBRARY_PATH="$arkbin:$TOOL_HOME/sdk/default/openharmony/toolchains/lib:${LD_LIBRARY_PATH:-}"
+              test -f "$arkbin/libhilog.so"
               js=$TOOL_HOME/bin/hvigorw.js
               if [ ! -f "$js" ]; then js=$TOOL_HOME/hvigor/bin/hvigorw.js; fi
               pm=$TOOL_HOME/ohpm/bin/pm-cli.js
