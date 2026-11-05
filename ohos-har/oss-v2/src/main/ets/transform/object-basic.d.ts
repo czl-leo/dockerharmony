@@ -1,0 +1,24 @@
+import type { OperationInput, OperationOutput } from '../types.js';
+import type { AppendObjectRequest, AppendObjectResult, CleanRestoredObjectRequest, CleanRestoredObjectResult, CopyObjectRequest, CopyObjectResult, DeleteMultipleObjectsRequest, DeleteMultipleObjectsResult, DeleteObjectRequest, DeleteObjectResult, GetObjectMetaRequest, GetObjectMetaResult, GetObjectRequest, GetObjectResult, HeadObjectRequest, HeadObjectResult, PutObjectRequest, PutObjectResult, RestoreObjectRequest, RestoreObjectResult } from '../models/object-basic.js';
+/** Serializes a presigned upload without adding a default `Content-Type`. */
+export declare function serializePutObjectPresign(request: PutObjectRequest): OperationInput;
+export declare function serializePutObject(request: PutObjectRequest): OperationInput;
+export declare function deserializePutObject(output: OperationOutput): Promise<PutObjectResult>;
+export declare function serializeGetObject(request: GetObjectRequest): OperationInput;
+export declare function deserializeGetObject(output: OperationOutput): GetObjectResult;
+export declare function serializeHeadObject(request: HeadObjectRequest): OperationInput;
+export declare function deserializeHeadObject(output: OperationOutput): Promise<HeadObjectResult>;
+export declare function serializeDeleteObject(request: DeleteObjectRequest): OperationInput;
+export declare function deserializeDeleteObject(output: OperationOutput): Promise<DeleteObjectResult>;
+export declare function serializeCopyObject(request: CopyObjectRequest): OperationInput;
+export declare function deserializeCopyObject(output: OperationOutput): Promise<CopyObjectResult>;
+export declare function serializeAppendObject(request: AppendObjectRequest): OperationInput;
+export declare function deserializeAppendObject(output: OperationOutput): Promise<AppendObjectResult>;
+export declare function serializeDeleteMultipleObjects(request: DeleteMultipleObjectsRequest): OperationInput;
+export declare function deserializeDeleteMultipleObjects(output: OperationOutput): Promise<DeleteMultipleObjectsResult>;
+export declare function serializeGetObjectMeta(request: GetObjectMetaRequest): OperationInput;
+export declare function deserializeGetObjectMeta(output: OperationOutput): Promise<GetObjectMetaResult>;
+export declare function serializeRestoreObject(request: RestoreObjectRequest): OperationInput;
+export declare function deserializeRestoreObject(output: OperationOutput): Promise<RestoreObjectResult>;
+export declare function serializeCleanRestoredObject(request: CleanRestoredObjectRequest): OperationInput;
+export declare function deserializeCleanRestoredObject(output: OperationOutput): Promise<CleanRestoredObjectResult>;

@@ -1,0 +1,16 @@
+import type { OperationInput, OperationOutput } from '../types.js';
+import type { DeleteBucketRequest, DeleteBucketResult, GetBucketInfoRequest, GetBucketInfoResult, GetBucketLocationRequest, GetBucketLocationResult, GetBucketStatRequest, GetBucketStatResult, ListObjectsRequest, ListObjectsResult, ListObjectsV2Request, ListObjectsV2Result, PutBucketRequest, PutBucketResult } from '../models/bucket-basic.js';
+export declare function serializeListObjectsV2(request: ListObjectsV2Request): OperationInput;
+export declare function deserializeListObjectsV2(output: OperationOutput): Promise<ListObjectsV2Result>;
+export declare function serializePutBucket(request: PutBucketRequest): OperationInput;
+export declare function deserializePutBucket(output: OperationOutput): Promise<PutBucketResult>;
+export declare function serializeDeleteBucket(request: DeleteBucketRequest): OperationInput;
+export declare function deserializeDeleteBucket(output: OperationOutput): Promise<DeleteBucketResult>;
+export declare function serializeListObjects(request: ListObjectsRequest): OperationInput;
+export declare function deserializeListObjects(output: OperationOutput): Promise<ListObjectsResult>;
+export declare function serializeGetBucketInfo(request: GetBucketInfoRequest): OperationInput;
+export declare function deserializeGetBucketInfo(output: OperationOutput): Promise<GetBucketInfoResult>;
+export declare function serializeGetBucketLocation(request: GetBucketLocationRequest): OperationInput;
+export declare function deserializeGetBucketLocation(output: OperationOutput): Promise<GetBucketLocationResult>;
+export declare function serializeGetBucketStat(request: GetBucketStatRequest): OperationInput;
+export declare function deserializeGetBucketStat(output: OperationOutput): Promise<GetBucketStatResult>;

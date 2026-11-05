@@ -1,0 +1,16 @@
+import type { OperationInput, OperationOutput } from '../types.js';
+import type { AbortMultipartUploadRequest, AbortMultipartUploadResult, CompleteMultipartUploadRequest, CompleteMultipartUploadResult, InitiateMultipartUploadRequest, InitiateMultipartUploadResult, ListMultipartUploadsRequest, ListMultipartUploadsResult, ListPartsRequest, ListPartsResult, UploadPartCopyRequest, UploadPartCopyResult, UploadPartRequest, UploadPartResult } from '../models/object-multipart.js';
+export declare function serializeInitiateMultipartUpload(request: InitiateMultipartUploadRequest): OperationInput;
+export declare function deserializeInitiateMultipartUpload(output: OperationOutput): Promise<InitiateMultipartUploadResult>;
+export declare function serializeUploadPart(request: UploadPartRequest): OperationInput;
+export declare function deserializeUploadPart(output: OperationOutput): Promise<UploadPartResult>;
+export declare function serializeCompleteMultipartUpload(request: CompleteMultipartUploadRequest): OperationInput;
+export declare function deserializeCompleteMultipartUpload(output: OperationOutput, hasCallback: boolean): Promise<CompleteMultipartUploadResult>;
+export declare function serializeUploadPartCopy(request: UploadPartCopyRequest): OperationInput;
+export declare function deserializeUploadPartCopy(output: OperationOutput): Promise<UploadPartCopyResult>;
+export declare function serializeAbortMultipartUpload(request: AbortMultipartUploadRequest): OperationInput;
+export declare function deserializeAbortMultipartUpload(output: OperationOutput): Promise<AbortMultipartUploadResult>;
+export declare function serializeListMultipartUploads(request: ListMultipartUploadsRequest): OperationInput;
+export declare function deserializeListMultipartUploads(output: OperationOutput): Promise<ListMultipartUploadsResult>;
+export declare function serializeListParts(request: ListPartsRequest): OperationInput;
+export declare function deserializeListParts(output: OperationOutput): Promise<ListPartsResult>;

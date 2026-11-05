@@ -1,0 +1,1 @@
+{"version":3,"file":"logger.js","sourceRoot":"","sources":["../../../src/log/logger.ts"],"names":[],"mappings":"","sourcesContent":["/** A logger interface compatible with `console`. */\nexport interface Logger {\n  debug(message: string): void\n  info(message: string): void\n  warn(message: string): void\n  error(message: string): void\n}\n"]}
