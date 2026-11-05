@@ -8,23 +8,9 @@ on:
 jobs:
   unit-test:
     runs-on: ubuntu-24.04-arm
-    container:
-      image: hqzing/dockerharmony:latest
-      volumes:
-        - /opt/node24:/__e/node24:rw,rshared
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: sh
+    timeout-minutes: 90
     steps:
-      - name: Setup node for actions
-        run: |
-          set -eu
-          curl -L -O https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz
-          mkdir -p /__e/node24/bin /opt
-          tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
-          ln -sf /opt/node-v24.2.0-openharmony-arm64/bin/node /__e/node24/bin/node
-          echo "/opt/node-v24.2.0-openharmony-arm64/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v5
 
       - name: Checkout OSS SDK
         uses: actions/checkout@v5
@@ -33,18 +19,9 @@ jobs:
           ref: dev-harmony-ci
           path: oss-sdk
 
-      - name: Record image toolchain
-        run: |
-          echo "PATH=$PATH"
-          for cmd in node npm hvigorw ohpm java python3 curl; do
-            if command -v "$cmd" >/dev/null 2>&1; then
-              echo "found $cmd: $(command -v "$cmd")"
-            else
-              echo "missing $cmd"
-            fi
-          done
-          node -v || true
-          npm -v || true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Install npm dependencies
         working-directory: oss-sdk
@@ -54,13 +31,61 @@ jobs:
         working-directory: oss-sdk
         run: npm run stage:har
 
-      - name: Install ohpm dependencies
-        working-directory: oss-sdk/ohos-har
-        run: ohpm install --all
+      - name: Download OpenHarmony command line tools
+        run: |
+          set -eux
+          curl -fL --retry 3 -o clt.tar.xz \
+            https://github.com/SwimmingTiger/command-line-tools/releases/download/ohos-arm64-26.0.0.621-26.0.0.18/command-line-tools-ohos-arm64-26.0.0.621-26.0.0.18.tar.xz
+          mkdir -p clt
+          tar -xJf clt.tar.xz -C clt
+          rm -f clt.tar.xz
+          find clt -maxdepth 2 -type d -name command-line-tools -printf '%p\n'
 
-      - name: Run ArkTS unit tests
-        working-directory: oss-sdk
-        run: npm run test:harmony
+      - name: Run ArkTS unit tests in dockerharmony
+        run: |
+          set -eux
+          tool=$(find clt -maxdepth 2 -type d -name command-line-tools | head -n 1)
+          test -n "$tool"
+          docker pull hqzing/dockerharmony:latest
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            -e TOOL_HOME="/work/$tool" \
+            -e DEVECO_SDK_HOME="/work/$tool/sdk" \
+            -e NODE_HOME="/work/$tool/tool/node" \
+            -e SSL_CERT_FILE=/etc/ssl/certs/cacert.pem \
+            hqzing/dockerharmony:latest \
+            /bin/sh -c '
+              set -eu
+              export PATH="$NODE_HOME/bin:$TOOL_HOME/bin:$PATH"
+              export LD_LIBRARY_PATH="$TOOL_HOME/sdk/default/openharmony/toolchains/lib:${LD_LIBRARY_PATH:-}"
+              js=$TOOL_HOME/bin/hvigorw.js
+              if [ ! -f "$js" ]; then js=$TOOL_HOME/hvigor/bin/hvigorw.js; fi
+              pm=$TOOL_HOME/ohpm/bin/pm-cli.js
+              test -f "$js"
+              test -f "$pm"
+              test -x "$NODE_HOME/bin/node"
+              mkdir -p /tmp/ohos-bin
+              printf "%s\n" "#!/bin/sh" "exec \"$NODE_HOME/bin/node\" -- \"$js\" \"\$@\"" > /tmp/ohos-bin/hvigorw
+              printf "%s\n" "#!/bin/sh" "exec \"$NODE_HOME/bin/node\" --no-deprecation \"$pm\" \"\$@\"" > /tmp/ohos-bin/ohpm
+              chmod +x /tmp/ohos-bin/hvigorw /tmp/ohos-bin/ohpm
+              export PATH="/tmp/ohos-bin:$PATH"
+              echo "::notice::node $($NODE_HOME/bin/node -v)"
+              echo "::notice::hvigor $(command -v hvigorw)"
+              echo "::notice::ohpm $(command -v ohpm)"
+              prev=$TOOL_HOME/sdk/default/openharmony/previewer/common/bin/Previewer
+              if [ -f "$prev" ]; then
+                "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev"
+              else
+                echo "::notice::Previewer missing"
+              fi
+              cd /work/oss-sdk/ohos-har
+              ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+              ohpm config set strict_ssl false
+              ohpm install --all
+              cd /work/oss-sdk
+              "$NODE_HOME/bin/node" scripts/run-harmony-test.mjs
+            '
 
       - name: Publish test log
         if: always()
