@@ -5,6 +5,10 @@ on:
     branches: [ "dev" ]
   workflow_dispatch:
 
+concurrency:
+  group: arkts-unit-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-test:
     runs-on: ubuntu-24.04-arm
@@ -59,14 +63,17 @@ jobs:
             gcc -shared -fPIC -nostdlib -Wl,-soname,libhilog.so -o stub/libhilog.so stub/hilog.c
             readelf -d stub/libhilog.so
           fi
-          # The packaged Previewer is the x86_64 Linux host binary. Register qemu
-          # so the arm64 container can execute it, and stage a glibc loader for it.
+          # Previewer in this package is an x86_64 glibc binary. Run it with
+          # qemu-user inside the arm64 image, against a staged glibc sysroot.
           sudo apt-get update
           sudo apt-get install -y qemu-user-static xvfb x11-xserver-utils
-          docker run --privileged --rm tonistiigi/binfmt --install amd64
+          qemu=$(command -v qemu-x86_64-static)
+          test -n "$qemu"
+          cp -a "$qemu" "$PWD/qemu-x86_64-static"
+          chmod +x "$PWD/qemu-x86_64-static"
           Xvfb :99 -screen 0 1080x1920x24 >/tmp/xvfb.log 2>&1 &
           sleep 1
-          DISPLAY=:99 xhost +local:
+          DISPLAY=:99 xhost +
           rm -rf x64root
           docker run --rm --platform linux/amd64 \
             -v "$PWD/x64root:/out" \
@@ -77,34 +84,22 @@ jobs:
               apt-get install -y --no-install-recommends \
                 libc6 libstdc++6 libgcc-s1 zlib1g libexpat1 \
                 libx11-6 libxext6 libxrender1 libxi6 libxrandr2 libxfixes3 \
-                libxcursor1 libxinerama1 libxcb1 \
+                libxcursor1 libxinerama1 libxcb1 libxkbcommon0 \
                 libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
-                libnss3 libdrm2 libgbm1 libasound2t64 ca-certificates
-              mkdir -p /out/lib/x86_64-linux-gnu /out/lib64
+                libnss3 libdrm2 libgbm1 libasound2t64 libpng16-16 libdbus-1-3 \
+                ca-certificates
+              mkdir -p /out/lib/x86_64-linux-gnu /out/lib64 /out/usr/lib/x86_64-linux-gnu
               cp -a /lib/x86_64-linux-gnu/. /out/lib/x86_64-linux-gnu/
+              if [ -d /usr/lib/x86_64-linux-gnu ]; then
+                cp -a /usr/lib/x86_64-linux-gnu/. /out/usr/lib/x86_64-linux-gnu/
+              fi
               if [ -e /lib64/ld-linux-x86-64.so.2 ]; then
                 cp -a /lib64/ld-linux-x86-64.so.2 /out/lib64/
               else
                 cp -a /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /out/lib64/ld-linux-x86-64.so.2
               fi
             '
-          prevjs=$(find "$tool" -path '*localTest/previewer.js' -type f | head -n 1 || true)
-          if [ -n "$prevjs" ]; then
-            # Windows appends Previewer.exe. Other platforms should append Previewer.
-            # OpenHarmony node does not report platform linux, so the directory was spawned.
-            PREVJS="$prevjs" node -e '
-              const fs = require("fs");
-              const p = process.env.PREVJS;
-              const s = fs.readFileSync(p, "utf8");
-              const old = "else if (process.platform === '\''darwin'\'' || process.platform === '\''linux'\'')";
-              if (!s.includes(old)) {
-                console.log("previewer.js has no platform check");
-                process.exit(0);
-              }
-              fs.writeFileSync(p, s.replace(old, "else if (process.platform !== '\''win32'\'')"));
-              console.log("patched " + p);
-            '
-          fi
+          node scripts/patch-hvigor-local-test.mjs "$tool"
           docker pull hqzing/dockerharmony:latest
           docker run --rm --security-opt seccomp=unconfined \
             -v "$PWD:/work" \
@@ -136,34 +131,39 @@ jobs:
               echo "::notice::node $($NODE_HOME/bin/node -v)"
               echo "::notice::hvigor $(command -v hvigorw)"
               echo "::notice::ohpm $(command -v ohpm)"
+              printf "%s\n" "#!/bin/sh" "exit 0" > /tmp/ohos-bin/lsof
+              chmod +x /tmp/ohos-bin/lsof
               prev=$TOOL_HOME/sdk/default/openharmony/previewer/common/bin/Previewer
               if [ -f "$prev" ] && [ ! -f "$prev.bin" ]; then
                 mv "$prev" "$prev.bin"
               fi
               if [ -f "$prev.bin" ]; then
                 chmod +x "$prev.bin"
+                test -x /work/qemu-x86_64-static
                 "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev.bin"
                 printf "%s\n" "#!/bin/sh" \
                   "dir=\$(CDPATH= cd -- \"\$(dirname \"\$0\")\" && pwd)" \
-                  "export LD_LIBRARY_PATH=\"\$dir\"" \
                   "export LIBGL_ALWAYS_SOFTWARE=1" \
-                  "exec \"\$dir/Previewer.bin\" \"\$@\"" > "$prev"
+                  "export QT_QPA_PLATFORM=offscreen" \
+                  "export LD_LIBRARY_PATH=\"\$dir:/work/x64root/lib/x86_64-linux-gnu:/work/x64root/usr/lib/x86_64-linux-gnu\"" \
+                  "exec /work/qemu-x86_64-static -L /work/x64root \"\$dir/Previewer.bin\" \"\$@\"" > "$prev"
                 chmod +x "$prev"
               else
                 echo "::notice::Previewer missing"
-              fi
-              mkdir -p /lib/x86_64-linux-gnu /lib64
-              if [ -d /work/x64root/lib/x86_64-linux-gnu ]; then
-                cp -a /work/x64root/lib/x86_64-linux-gnu/. /lib/x86_64-linux-gnu/
-              fi
-              if [ -e /work/x64root/lib64/ld-linux-x86-64.so.2 ]; then
-                cp -a /work/x64root/lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2
               fi
               cd /work/ohos-har
               ohpm config set registry https://ohpm.openharmony.cn/ohpm/
               ohpm config set strict_ssl false
               ohpm install --all
+              set +e
               hvigorw test -p module=oss_v2 -p coverage=false --no-daemon
+              code=$?
+              set -e
+              if [ -f /work/previewer.log ]; then
+                echo "----- previewer.log -----"
+                cat /work/previewer.log
+              fi
+              exit "$code"
             '
 
       - name: Publish test log
