@@ -74,6 +74,23 @@ jobs:
             gcc -shared -fPIC -nostdlib -Wl,-soname,libhilog.so -o stub/libhilog.so stub/hilog.c
             readelf -d stub/libhilog.so
           fi
+          prevjs=$(find "$tool" -path '*localTest/previewer.js' -type f | head -n 1 || true)
+          if [ -n "$prevjs" ]; then
+            # Windows appends Previewer.exe. Other platforms should append Previewer.
+            # OpenHarmony node does not report platform linux, so the directory was spawned.
+            PREVJS="$prevjs" node -e '
+              const fs = require("fs");
+              const p = process.env.PREVJS;
+              const s = fs.readFileSync(p, "utf8");
+              const old = "else if (process.platform === '\''darwin'\'' || process.platform === '\''linux'\'')";
+              if (!s.includes(old)) {
+                console.log("previewer.js has no platform check");
+                process.exit(0);
+              }
+              fs.writeFileSync(p, s.replace(old, "else if (process.platform !== '\''win32'\'')"));
+              console.log("patched " + p);
+            '
+          fi
           docker pull hqzing/dockerharmony:latest
           docker run --rm \
             -v "$PWD:/work" \
@@ -105,6 +122,7 @@ jobs:
               echo "::notice::ohpm $(command -v ohpm)"
               prev=$TOOL_HOME/sdk/default/openharmony/previewer/common/bin/Previewer
               if [ -f "$prev" ]; then
+                chmod +x "$prev"
                 "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev"
               else
                 echo "::notice::Previewer missing"
