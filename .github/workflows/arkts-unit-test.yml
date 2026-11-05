@@ -98,6 +98,9 @@ jobs:
             ubuntu:24.04 \
             bash -c 'set -eux
               export DEBIAN_FRONTEND=noninteractive
+              if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+                sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
+              fi
               apt-get update
               apt-get install -y --no-install-recommends \
                 libc6 libstdc++6 libgcc-s1 zlib1g libexpat1 \
@@ -105,8 +108,27 @@ jobs:
                 libxcursor1 libxinerama1 libxcb1 libxkbcommon0 \
                 libgl1 libegl1 libglib2.0-0 libfontconfig1 libfreetype6 \
                 libnss3 libdrm2 libgbm1 libasound2t64 libpng16-16 libdbus-1-3 \
-                ca-certificates
+                ca-certificates gcc make libc6-dev dpkg-dev
               mkdir -p /out/lib/x86_64-linux-gnu /out/lib64 /out/usr/lib/x86_64-linux-gnu
+              # The Linux Previewer package never ships libshared_libz.so.
+              # libide_extension.so needs the minizip entry points (unzOpen and
+              # the rest), which the Windows SDK builds into libshared_libz.dll.
+              cd /tmp
+              apt-get source -y zlib
+              zsrc=$(find /tmp -maxdepth 1 -type d -name "zlib-*" | head -n 1)
+              test -f "$zsrc/contrib/minizip/unzip.c"
+              cd "$zsrc"
+              CFLAGS="-O2 -fPIC" ./configure
+              make -j2 libz.a
+              gcc -shared -fPIC -O2 -D_LARGEFILE64_SOURCE \
+                -I"$zsrc" -I"$zsrc/contrib/minizip" \
+                -Wl,-soname,libshared_libz.so \
+                "$zsrc/contrib/minizip/ioapi.c" \
+                "$zsrc/contrib/minizip/unzip.c" \
+                "$zsrc/contrib/minizip/zip.c" \
+                -Wl,--whole-archive "$zsrc/libz.a" -Wl,--no-whole-archive \
+                -o /out/lib/x86_64-linux-gnu/libshared_libz.so
+              cd /
               cp -a /lib/x86_64-linux-gnu/. /out/lib/x86_64-linux-gnu/
               if [ -d /usr/lib/x86_64-linux-gnu ]; then
                 cp -a /usr/lib/x86_64-linux-gnu/. /out/usr/lib/x86_64-linux-gnu/
@@ -164,7 +186,6 @@ jobs:
                 test -x /work/qemu-x86_64-static
                 "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev.bin"
                 # qemu -L looks up libraries inside the sysroot, not next to the binary.
-                # Follow symlinks so a NEEDED name such as libshared_libz.so is a real file.
                 mkdir -p /work/x64root/lib/x86_64-linux-gnu
                 find /work/x64-previewer "$(dirname "$prev.bin")" -name "*.so*" > /tmp/previewer-sos.txt || true
                 while read -r so; do
@@ -179,7 +200,15 @@ jobs:
                     cp -a "$so" "/work/x64root/lib/x86_64-linux-gnu/$base"
                   fi
                 done < /tmp/previewer-sos.txt
-                echo "::notice::previewer libs $(find /work/x64root/lib/x86_64-linux-gnu -name "libshared*" -o -name "libz*" | tr "\n" " ")"
+                # Previewer asks for libhilog.so. This package ships that code as libhilog_linux.so.
+                hilog=$(find /work/x64root/lib/x86_64-linux-gnu /work/x64-previewer -name libhilog_linux.so -type f | head -n 1)
+                if [ -n "$hilog" ]; then
+                  cp -a "$hilog" /work/x64root/lib/x86_64-linux-gnu/libhilog.so
+                fi
+                test -f /work/x64root/lib/x86_64-linux-gnu/libshared_libz.so
+                test -f /work/x64root/lib/x86_64-linux-gnu/libhilog.so
+                echo "::notice::libshared_libz $(ls -l /work/x64root/lib/x86_64-linux-gnu/libshared_libz.so)"
+                echo "::notice::libhilog $(ls -l /work/x64root/lib/x86_64-linux-gnu/libhilog.so)"
                 printf "%s\n" "#!/bin/sh" \
                   "dir=\$(CDPATH= cd -- \"\$(dirname \"\$0\")\" && pwd)" \
                   "export LIBGL_ALWAYS_SOFTWARE=1" \
