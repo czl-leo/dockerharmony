@@ -164,19 +164,22 @@ jobs:
                 test -x /work/qemu-x86_64-static
                 "$NODE_HOME/bin/node" -e "const fs=require(\"fs\"); const b=fs.readFileSync(process.argv[1]); console.log(\"::notice::Previewer elf_machine=\"+b.readUInt16LE(18)+\" bytes=\"+b.length)" "$prev.bin"
                 # qemu -L looks up libraries inside the sysroot, not next to the binary.
+                # Follow symlinks so a NEEDED name such as libshared_libz.so is a real file.
                 mkdir -p /work/x64root/lib/x86_64-linux-gnu
-                find "$TOOL_HOME" -path '*/previewer/*' -name '*.so' -type f > /tmp/previewer-sos.txt || true
+                find /work/x64-previewer "$(dirname "$prev.bin")" \( -name '*.so' -o -name '*.so.*' \) > /tmp/previewer-sos.txt || true
                 while read -r so; do
+                  [ -n "$so" ] || continue
+                  base=$(basename "$so")
+                  if [ -L "$so" ]; then
+                    cp -aL "$so" "/work/x64root/lib/x86_64-linux-gnu/$base" 2>/dev/null || true
+                    continue
+                  fi
                   machine=$("$NODE_HOME/bin/node" -e "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.length<20||b[0]!==0x7f) process.exit(2); process.stdout.write(String(b.readUInt16LE(18)))" "$so" || true)
                   if [ "$machine" = "62" ]; then
-                    cp -a "$so" /work/x64root/lib/x86_64-linux-gnu/
+                    cp -a "$so" "/work/x64root/lib/x86_64-linux-gnu/$base"
                   fi
                 done < /tmp/previewer-sos.txt
-                if [ ! -f /work/x64root/lib/x86_64-linux-gnu/libshared_libz.so ]; then
-                  echo "::error::libshared_libz.so is not in the command line tools"
-                  find "$TOOL_HOME" -name 'libshared_libz*' -type f
-                  exit 1
-                fi
+                echo "::notice::previewer libs $(find /work/x64root/lib/x86_64-linux-gnu -name 'libshared*' -o -name 'libz*' | tr '\n' ' ')"
                 printf "%s\n" "#!/bin/sh" \
                   "dir=\$(CDPATH= cd -- \"\$(dirname \"\$0\")\" && pwd)" \
                   "export LIBGL_ALWAYS_SOFTWARE=1" \
