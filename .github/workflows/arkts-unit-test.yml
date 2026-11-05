@@ -1,0 +1,83 @@
+name: ArkTS unit test
+
+on:
+  push:
+    branches: [ "try-image" ]
+  workflow_dispatch:
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: hqzing/dockerharmony:latest
+      volumes:
+        - /opt/node24:/__e/node24:rw,rshared
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Setup node for actions
+        run: |
+          set -eu
+          curl -L -O https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz
+          mkdir -p /__e/node24/bin /opt
+          tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
+          ln -sf /opt/node-v24.2.0-openharmony-arm64/bin/node /__e/node24/bin/node
+          echo "/opt/node-v24.2.0-openharmony-arm64/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout OSS SDK
+        uses: actions/checkout@v5
+        with:
+          repository: czl-leo/alibabacloud-oss-ts-sdk-v2
+          ref: dev-harmony-ci
+          path: oss-sdk
+
+      - name: Record image toolchain
+        run: |
+          echo "PATH=$PATH"
+          for cmd in node npm hvigorw ohpm java python3 curl; do
+            if command -v "$cmd" >/dev/null 2>&1; then
+              echo "found $cmd: $(command -v "$cmd")"
+            else
+              echo "missing $cmd"
+            fi
+          done
+          node -v || true
+          npm -v || true
+
+      - name: Install npm dependencies
+        working-directory: oss-sdk
+        run: npm install --no-package-lock
+
+      - name: Stage the har
+        working-directory: oss-sdk
+        run: npm run stage:har
+
+      - name: Install ohpm dependencies
+        working-directory: oss-sdk/ohos-har
+        run: ohpm install --all
+
+      - name: Run ArkTS unit tests
+        working-directory: oss-sdk
+        run: npm run test:harmony
+
+      - name: Publish test log
+        if: always()
+        run: |
+          result=oss-sdk/ohos-har/oss-v2/.test/default/intermediates/test/coverage_data/test_result.txt
+          if [ -f "$result" ]; then
+            echo "## ArkTS unit tests" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$result" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arkts-unit-test
+          path: |
+            oss-sdk/ohos-har/oss-v2/.test/default/intermediates/test/coverage_data/test_result.txt
+            oss-sdk/ohos-har/oss-v2/.test/default/outputs/test/reports/
+          if-no-files-found: warn
