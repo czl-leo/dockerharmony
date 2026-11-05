@@ -46,6 +46,34 @@ jobs:
           set -eux
           tool=$(find clt -maxdepth 2 -type d -name command-line-tools | head -n 1)
           test -n "$tool"
+          es2abc=$(find "$tool" -path '*/ark/build/bin/es2abc' -type f | head -n 1)
+          test -n "$es2abc"
+          echo "es2abc=$es2abc"
+          readelf -d "$es2abc"
+          mkdir -p stub
+          real=$(find "$tool" -name 'libhilog.so' -type f | head -n 1 || true)
+          if [ -n "$real" ]; then
+            cp -a "$real" stub/libhilog.so
+            echo "using $real"
+          else
+            # This image disables HiLog (disable-hilog.patch) because there is no
+            # HiLog service. es2abc still needs the library, so provide a no-op one.
+            # -nostdlib keeps the stub free of glibc, so musl can load it.
+            readelf -Ws "$es2abc" | awk '/ UND / {print $NF}' | sed 's/@.*//' | grep -E 'HiLog|OH_LOG|hilog' | sort -u > stub/syms.txt || true
+            if [ ! -s stub/syms.txt ]; then
+              echo HiLogPrint > stub/syms.txt
+            fi
+            cat stub/syms.txt
+            {
+              echo 'int __attribute__((visibility("default"))) __dummy_keep(void){return 0;}'
+              while read -r sym; do
+                [ -n "$sym" ] || continue
+                echo "int ${sym}(void){return 0;}"
+              done < stub/syms.txt
+            } > stub/hilog.c
+            gcc -shared -fPIC -nostdlib -Wl,-soname,libhilog.so -o stub/libhilog.so stub/hilog.c
+            readelf -d stub/libhilog.so
+          fi
           docker pull hqzing/dockerharmony:latest
           docker run --rm \
             -v "$PWD:/work" \
@@ -58,11 +86,9 @@ jobs:
             /bin/sh -c '
               set -eu
               export PATH="$NODE_HOME/bin:$TOOL_HOME/bin:$PATH"
-              # es2abc needs libhilog.so beside it. Windows finds that DLL next to
-              # es2abc.exe; musl only searches LD_LIBRARY_PATH.
               arkbin=$TOOL_HOME/sdk/default/openharmony/ets/build-tools/ets-loader/bin/ark/build/bin
-              export LD_LIBRARY_PATH="$arkbin:$TOOL_HOME/sdk/default/openharmony/toolchains/lib:${LD_LIBRARY_PATH:-}"
-              test -f "$arkbin/libhilog.so"
+              export LD_LIBRARY_PATH="/work/stub:$arkbin:$TOOL_HOME/sdk/default/openharmony/toolchains/lib:${LD_LIBRARY_PATH:-}"
+              test -f /work/stub/libhilog.so
               js=$TOOL_HOME/bin/hvigorw.js
               if [ ! -f "$js" ]; then js=$TOOL_HOME/hvigor/bin/hvigorw.js; fi
               pm=$TOOL_HOME/ohpm/bin/pm-cli.js
