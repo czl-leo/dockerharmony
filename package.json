@@ -1,0 +1,7 @@
+{
+  "name": "dockerharmony-oss-tests",
+  "private": true,
+  "scripts": {
+    "test:ohpm-mock": "node scripts/test-ohpm-mock.mjs"
+  }
+}

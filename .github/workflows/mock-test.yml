@@ -1,0 +1,72 @@
+name: ArkTS mock test
+
+on:
+  push:
+    branches: [ "dev" ]
+  workflow_dispatch:
+
+concurrency:
+  group: mock-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mock-test:
+    runs-on: [self-hosted, Windows, mate60]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Locate preinstalled HarmonyOS tools
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Add-Bin([string]$dir) {
+            if (Test-Path -LiteralPath $dir) {
+              [System.IO.File]::AppendAllText($env:GITHUB_PATH, ($dir + [Environment]::NewLine))
+            }
+          }
+          Add-Bin 'E:\DevEco Studio\jbr\bin'
+          Add-Bin 'E:\DevEco Studio\tools\hvigor\bin'
+          Add-Bin 'E:\DevEco Studio\tools\ohpm\bin'
+          Add-Bin 'E:\DevEco Studio\tools\node'
+          Add-Bin 'E:\DevEco Studio\sdk\default\openharmony\toolchains'
+          if (Test-Path -LiteralPath 'E:\DevEco Studio\sdk') {
+            [System.IO.File]::AppendAllText($env:GITHUB_ENV, "DEVECO_SDK_HOME=E:\DevEco Studio\sdk$([Environment]::NewLine)")
+            [System.IO.File]::AppendAllText($env:GITHUB_ENV, "NODE_HOME=E:\DevEco Studio\tools\node$([Environment]::NewLine)")
+          }
+
+      - name: Check DevEco tools
+        run: |
+          where node
+          where java
+          where hvigorw
+          where ohpm
+          node -v
+          java -version
+
+      - name: Install ohpm dependencies
+        working-directory: ohos-har
+        run: ohpm install --all
+
+      - name: Run ArkTS mock tests
+        run: npm run test:ohpm-mock
+
+      - name: Publish test log
+        if: always()
+        run: |
+          if exist ohos-har\oss-v2\.test\default\intermediates\test\coverage_data\test_result.txt (
+            echo ## ArkTS mock tests>>"%GITHUB_STEP_SUMMARY%"
+            echo ```>>"%GITHUB_STEP_SUMMARY%"
+            type ohos-har\oss-v2\.test\default\intermediates\test\coverage_data\test_result.txt>>"%GITHUB_STEP_SUMMARY%"
+            echo ```>>"%GITHUB_STEP_SUMMARY%"
+          )
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arkts-mock-test
+          path: ohos-har/oss-v2/.test/default/intermediates/test/coverage_data/test_result.txt
+          if-no-files-found: warn
